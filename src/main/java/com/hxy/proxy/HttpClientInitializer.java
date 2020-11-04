@@ -11,10 +11,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class HttpClientInitializer extends ChannelInitializer<SocketChannel> {
 
-    private final AtomicReference<ChannelHandlerContext> reponseChannelRef;
+    private final AtomicReference<ChannelHandlerContext> responseChannelRef;
 
     public HttpClientInitializer(AtomicReference<ChannelHandlerContext> responseChannelRef) {
-        this.reponseChannelRef = responseChannelRef;
+        this.responseChannelRef = responseChannelRef;
     }
 
     @Override
@@ -22,7 +22,7 @@ public class HttpClientInitializer extends ChannelInitializer<SocketChannel> {
         ChannelPipeline p = ch.pipeline();
         p.addLast(new HttpClientCodec());
         p.addLast(new HttpContentDecompressor());
-        p.addLast(new HttpClientHandler(reponseChannelRef));
+        p.addLast(new HttpClientHandler(responseChannelRef));
     }
 
 }

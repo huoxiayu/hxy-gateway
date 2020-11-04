@@ -15,19 +15,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 public class NettyHttpClient implements HttpClient {
 
-    private static final int MAX_REQ_PER_HOST = 10;
+    private static final int MAX_REQ_PER_HOST = 1;
     private static final ConcurrentHashMap<String, List<InnerNettyClient>> HOST_AND_PORT_2_CLIENTS = new ConcurrentHashMap<>();
 
     private static class InnerNettyClient {
-        private static final AtomicInteger CNT = new AtomicInteger();
 
-        private final AtomicReference<ChannelHandlerContext> responseChannel = new AtomicReference<>();
+        private final AtomicReference<ChannelHandlerContext> responseChannel = new AtomicReference<>(null);
         private final Channel channel;
 
         private InnerNettyClient(String host, int port) {
@@ -35,7 +33,6 @@ public class NettyHttpClient implements HttpClient {
         }
 
         private Channel initChannel(String host, int port) {
-            log.info("current channel cnt {}", CNT.incrementAndGet());
             EventLoopGroup group = new NioEventLoopGroup();
             Bootstrap b = new Bootstrap();
             b.group(group).channel(NioSocketChannel.class).handler(new HttpClientInitializer(responseChannel));
@@ -47,11 +44,11 @@ public class NettyHttpClient implements HttpClient {
         }
 
         private void process(FullHttpRequest request) {
-            this.channel.writeAndFlush(request);
+            channel.writeAndFlush(request);
         }
 
-        private void updateResponseChannelReference(ChannelHandlerContext ctx) {
-            responseChannel.compareAndSet(null, ctx);
+        private boolean updateResponseChannelReference(ChannelHandlerContext ctx) {
+            return responseChannel.compareAndSet(null, ctx);
         }
 
     }
@@ -63,9 +60,24 @@ public class NettyHttpClient implements HttpClient {
             String host = uri.getHost();
             int port = uri.getPort();
             InnerNettyClient client = chooseClient(host, port);
-            client.updateResponseChannelReference(ctx);
-            client.process(fullRequest);
-        } catch (URISyntaxException e) {
+
+            Object lock = client.responseChannel;
+
+            ctx.channel().closeFuture().addListener(future -> {
+                synchronized (lock) {
+                    lock.notifyAll();
+                }
+            });
+
+            synchronized (lock) {
+                log.info("lock obj {}", System.identityHashCode(lock));
+                while (!client.updateResponseChannelReference(ctx)) {
+                    lock.wait();
+                }
+
+                client.process(fullRequest);
+            }
+        } catch (URISyntaxException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }

@@ -21,10 +21,10 @@ import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 @Slf4j
 public class HttpClientHandler extends ChannelInboundHandlerAdapter {
 
-    private final AtomicReference<ChannelHandlerContext> responseChannelRef;
+    private final AtomicReference<ChannelHandlerContext> responseChannel;
 
-    public HttpClientHandler(AtomicReference<ChannelHandlerContext> responseChannelRef) {
-        this.responseChannelRef = responseChannelRef;
+    public HttpClientHandler(AtomicReference<ChannelHandlerContext> responseChannel) {
+        this.responseChannel = responseChannel;
     }
 
     @Override
@@ -54,10 +54,19 @@ public class HttpClientHandler extends ChannelInboundHandlerAdapter {
                 httpHeaders.setInt("Content-Length", bytes.capacity());
                 log.debug("fullHttpResponse: {}", fullHttpResponse);
 
-                ChannelHandlerContext responseChannelRef = this.responseChannelRef.getAndSet(null);
-                responseChannelRef.writeAndFlush(fullHttpResponse);
+                ChannelHandlerContext responseCtx = responseChannel.get();
+                responseCtx.writeAndFlush(fullHttpResponse);
 
-                ctx.close();
+                // ctx.close();
+
+                responseChannel.set(null);
+
+                Object unlock = responseChannel;
+                synchronized (unlock) {
+                    unlock.notifyAll();
+                    log.info("unlock obj {}", System.identityHashCode(unlock));
+
+                }
             }
         }
     }

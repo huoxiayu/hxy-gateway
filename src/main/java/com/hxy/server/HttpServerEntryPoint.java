@@ -33,7 +33,7 @@ public class HttpServerEntryPoint {
                 .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
                 .group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
-                .handler(new LoggingHandler(LogLevel.INFO))
+                .handler(new LoggingHandler(LogLevel.DEBUG))
                 .childHandler(new HttpServerInitializer());
 
             Channel channel = serverBootstrap.bind(PORT).sync().channel();
