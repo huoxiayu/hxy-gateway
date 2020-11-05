@@ -26,7 +26,7 @@ public class UrlMappingHandler {
         Preconditions.checkArgument(StringUtils.isNotBlank(uri), "empty request url");
 
         if ("/api/hello".equals(uri)) {
-            return ImmutableList.of("http://localhost:8088", "http://localhost:8089");
+            return ImmutableList.of("http://localhost:8088", "http://localhost:8088");
         }
 
         log.error("not recognized url {}", uri);

@@ -14,6 +14,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -45,6 +46,7 @@ public class NettyHttpClient implements HttpClient {
 
         private void process(FullHttpRequest request) {
             channel.writeAndFlush(request);
+            log.debug("send request {} on channel {}", request, channel.id());
         }
 
         private boolean updateResponseChannelReference(ChannelHandlerContext ctx) {
@@ -61,23 +63,11 @@ public class NettyHttpClient implements HttpClient {
             int port = uri.getPort();
             InnerNettyClient client = chooseClient(host, port);
 
-            Object lock = client.responseChannel;
+            client.updateResponseChannelReference(ctx);
+            client.process(fullRequest);
 
-            ctx.channel().closeFuture().addListener(future -> {
-                synchronized (lock) {
-                    lock.notifyAll();
-                }
-            });
-
-            synchronized (lock) {
-                log.info("lock obj {}", System.identityHashCode(lock));
-                while (!client.updateResponseChannelReference(ctx)) {
-                    lock.wait();
-                }
-
-                client.process(fullRequest);
-            }
-        } catch (URISyntaxException | InterruptedException e) {
+            ctx.channel().closeFuture().get();
+        } catch (URISyntaxException | InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
         }
     }

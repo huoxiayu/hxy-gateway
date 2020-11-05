@@ -57,16 +57,9 @@ public class HttpClientHandler extends ChannelInboundHandlerAdapter {
                 ChannelHandlerContext responseCtx = responseChannel.get();
                 responseCtx.writeAndFlush(fullHttpResponse);
 
-                // ctx.close();
-
                 responseChannel.set(null);
 
-                Object unlock = responseChannel;
-                synchronized (unlock) {
-                    unlock.notifyAll();
-                    log.info("unlock obj {}", System.identityHashCode(unlock));
-
-                }
+                ctx.close();
             }
         }
     }
